@@ -20,7 +20,7 @@ import tensorflow as tf
 from object_detection.core import standard_fields
 
 
-def build_input(tfrecord_paths):
+def build_input(tfrecord_paths,is_habana):
   """Builds the graph's input.
 
   Args:
@@ -43,10 +43,15 @@ def build_input(tfrecord_paths):
               tf.FixedLenFeature([], tf.string),
       })
   encoded_image = features[standard_fields.TfExampleFields.image_encoded]
-  image_tensor = tf.image.decode_image(encoded_image, channels=3)
-  image_tensor.set_shape([None, None, 3])
+    # image_tensor = tf.image.decode_image(encoded_image, channels=3)
+    # image_tensor.set_shape([None, None, 3])
+    # image_tensor = tf.expand_dims(image_tensor, 0)
+  image_tensor = tf.image.decode_jpeg(encoded_image, channels=3)
+  if is_habana:
+    image_tensor = tf.image.resize_images(image_tensor, (600, 800))
+    image_tensor = tf.cast(image_tensor, tf.uint8)
+  image_tensor.set_shape([600, 800, 3])
   image_tensor = tf.expand_dims(image_tensor, 0)
-
   return serialized_example_tensor, image_tensor
 
 

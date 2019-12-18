@@ -216,7 +216,7 @@ def _create_tf_record_from_coco_annotations(
     images = groundtruth_data['images']
     category_index = label_map_util.create_category_index(
         groundtruth_data['categories'])
-    curated_lists = [int(id.strip()) for id in open('/home/sathish/faster_rcnn/coco2014/mscoco_minival_ids.txt').readlines()]
+    curated_lists = [int(id.strip()) for id in open('/home/mcw/seg-qa/faster_rcnn/test_set.txt').readlines()]
     annotations_index = {}
     if 'annotations' in groundtruth_data:
       tf.logging.info(

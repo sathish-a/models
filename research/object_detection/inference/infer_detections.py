@@ -72,7 +72,7 @@ def main(_):
         v for v in FLAGS.input_tfrecord_paths.split(',') if v]
     tf.logging.info('Reading input from %d files', len(input_tfrecord_paths))
     serialized_example_tensor, image_tensor = detection_inference.build_input(
-        input_tfrecord_paths)
+        input_tfrecord_paths,FLAGS.is_habana)
     tf.logging.info('Reading graph and building model...')
     (detected_boxes_tensor, detected_scores_tensor,
      detected_labels_tensor) = detection_inference.build_inference_graph(
