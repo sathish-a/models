@@ -42,12 +42,13 @@ class StringParser(data_parser.DataToNumpyParser):
 
   def __init__(self, field_name):
     self.field_name = field_name
-
+  
   def parse(self, tf_example):
-    return "".join(tf_example.features.feature[self.field_name]
+    x = b"".join(tf_example.features.feature[self.field_name]
                    .bytes_list.value) if tf_example.features.feature[
                        self.field_name].HasField("bytes_list") else None
-
+    x = x.decode("utf-8") if x else None
+    return x
 
 class Int64Parser(data_parser.DataToNumpyParser):
   """Tensorflow Example int64 parser."""
@@ -116,6 +117,14 @@ class TfExampleDetectionAndGTParser(data_parser.DataToNumpyParser):
             Int64Parser(fields.TfExampleFields.object_group_of),
         fields.InputDataFields.groundtruth_image_classes:
             Int64Parser(fields.TfExampleFields.image_class_label),
+        fields.InputDataFields.groundtruth_is_crowd: (
+            Int64Parser(fields.TfExampleFields.object_is_crowd)),
+        fields.InputDataFields.groundtruth_area: (
+            FloatParser(fields.TfExampleFields.object_area)),
+        #fields.InputDataFields.original_image_height: (
+        #    Int64Parser(fields.TfExampleFields.height)),
+        #fields.InputDataFields.original_image_width: (
+        #    Int64Parser(fields.TfExampleFields.width))    
     }
 
   def parse(self, tf_example):

@@ -33,11 +33,11 @@ reduces the output size and can potentially accelerate reading data in
 subsequent processing steps that don't require the images (e.g. computing
 metrics).
 """
-
+from pathlib import Path
 import itertools
 import tensorflow as tf
 from object_detection.inference import detection_inference
-
+import os
 tf.flags.DEFINE_string('input_tfrecord_paths', None,
                        'A comma separated list of paths to input TFRecords.')
 tf.flags.DEFINE_string('output_tfrecord_path', None,
@@ -49,6 +49,8 @@ tf.flags.DEFINE_boolean('discard_image_pixels', False,
                         ' significantly reduces the output size and is useful'
                         ' if the subsequent tools don\'t need access to the'
                         ' images (e.g. when computing evaluation measures).')
+tf.flags.DEFINE_boolean('is_habana', False,
+			'Flag to set if the inference graph has habana ops.')
 
 FLAGS = tf.flags.FLAGS
 
@@ -61,7 +63,10 @@ def main(_):
   for flag_name in required_flags:
     if not getattr(FLAGS, flag_name):
       raise ValueError('Flag --{} is required'.format(flag_name))
-
+  if FLAGS.is_habana:
+    import habanatf
+    os.environ['HABANA_RECIPE_PATH'] = str(Path(FLAGS.inference_graph).parent)
+  tf.logging.set_verbosity(tf.logging.INFO)
   with tf.Session() as sess:
     input_tfrecord_paths = [
         v for v in FLAGS.input_tfrecord_paths.split(',') if v]

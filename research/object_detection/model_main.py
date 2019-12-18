@@ -85,14 +85,17 @@ def main(unused_argv):
       # The first eval input will be evaluated.
       input_fn = eval_input_fns[0]
     if FLAGS.run_once:
+      print("*"*20,"Evaluation","*"*20)
       estimator.evaluate(input_fn,
                          steps=None,
                          checkpoint_path=tf.train.latest_checkpoint(
                              FLAGS.checkpoint_dir))
     else:
+      print("*"*20,"Evaluation-Continuous","*"*20)
       model_lib.continuous_eval(estimator, FLAGS.checkpoint_dir, input_fn,
                                 train_steps, name)
   else:
+    print("*"*20,"Training","*"*20)  
     train_spec, eval_specs = model_lib.create_train_and_eval_specs(
         train_input_fn,
         eval_input_fns,

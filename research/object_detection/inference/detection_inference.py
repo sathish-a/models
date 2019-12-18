@@ -74,7 +74,7 @@ def build_inference_graph(image_tensor, inference_graph_path):
       graph_def, name='', input_map={'image_tensor': image_tensor})
 
   g = tf.get_default_graph()
-
+  
   num_detections_tensor = tf.squeeze(
       g.get_tensor_by_name('num_detections:0'), 0)
   num_detections_tensor = tf.cast(num_detections_tensor, tf.int32)
@@ -91,7 +91,8 @@ def build_inference_graph(image_tensor, inference_graph_path):
       g.get_tensor_by_name('detection_classes:0'), 0)
   detected_labels_tensor = tf.cast(detected_labels_tensor, tf.int64)
   detected_labels_tensor = detected_labels_tensor[:num_detections_tensor]
-
+  tf.train.write_graph(g.as_graph_def(),'',"/home/sathish/faster_rcnn/tmp.pb",as_text=False)
+  exit()
   return detected_boxes_tensor, detected_scores_tensor, detected_labels_tensor
 
 
