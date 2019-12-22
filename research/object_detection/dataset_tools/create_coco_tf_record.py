@@ -51,18 +51,12 @@ flags = tf.app.flags
 tf.flags.DEFINE_boolean('include_masks', False,
                         'Whether to include instance segmentations masks '
                         '(PNG encoded) in the result. default: False.')
-tf.flags.DEFINE_string('train_image_dir', '',
-                       'Training image directory.')
-tf.flags.DEFINE_string('val_image_dir', '',
-                       'Validation image directory.')
-tf.flags.DEFINE_string('test_image_dir', '',
-                       'Test image directory.')
-tf.flags.DEFINE_string('train_annotations_file', '',
-                       'Training annotations JSON file.')
-tf.flags.DEFINE_string('val_annotations_file', '',
-                       'Validation annotations JSON file.')
-tf.flags.DEFINE_string('testdev_annotations_file', '',
-                       'Test-dev annotations JSON file.')
+tf.flags.DEFINE_string('image_dir', '',
+                       'Image directory.')
+tf.flags.DEFINE_string('annotations_file', '',
+                       'Annotations JSON file.')
+tf.flags.DEFINE_string('filter_by_image_id', '',
+                       'Filter Image IDs text file.')
 tf.flags.DEFINE_string('output_dir', '/tmp/', 'Output data directory.')
 
 FLAGS = flags.FLAGS
@@ -197,7 +191,7 @@ def create_tf_example(image,
 
 
 def _create_tf_record_from_coco_annotations(
-    annotations_file, image_dir, output_path, include_masks, num_shards):
+    annotations_file, image_dir, filter_by_image_id, output_path, include_masks, num_shards):
   """Loads COCO annotation json files and converts to tf.Record format.
 
   Args:
@@ -216,7 +210,6 @@ def _create_tf_record_from_coco_annotations(
     images = groundtruth_data['images']
     category_index = label_map_util.create_category_index(
         groundtruth_data['categories'])
-    curated_lists = [int(id.strip()) for id in open('/home/mcw/seg-qa/faster_rcnn/test_set.txt').readlines()]
     annotations_index = {}
     if 'annotations' in groundtruth_data:
       tf.logging.info(
@@ -234,36 +227,52 @@ def _create_tf_record_from_coco_annotations(
         annotations_index[image_id] = []
     tf.logging.info('%d images are missing annotations.',
                     missing_annotation_count)
+    if filter_by_image_id:
+      curated_lists = [int(id.strip()) for id in open(filter_by_image_id).readlines()]
+      curated_counter = 0
 
     total_num_annotations_skipped = 0
-    curated_counter = 0
+    image_counter = 0
     for idx, image in enumerate(images):
-      if int(image['id']) in curated_lists:
-        if curated_counter % 100 == 0:
-          tf.logging.info('On image %d of %d', curated_counter, len(images))
+      if filter_by_image_id:
+        if int(image['id']) in curated_lists:
+          if curated_counter % 100 == 0:
+            tf.logging.info('On image %d of %d', curated_counter, len(images))
+          annotations_list = annotations_index[image['id']]
+          _, tf_example, num_annotations_skipped = create_tf_example(
+              image, annotations_list, image_dir, category_index, include_masks)
+          total_num_annotations_skipped += num_annotations_skipped
+          shard_idx = idx % num_shards
+          output_tfrecords[shard_idx].write(tf_example.SerializeToString())
+          curated_counter += 1
+      else:
+        if idx % 100 == 0:
+          tf.logging.info('On image %d of %d', idx, len(images))
         annotations_list = annotations_index[image['id']]
         _, tf_example, num_annotations_skipped = create_tf_example(
             image, annotations_list, image_dir, category_index, include_masks)
         total_num_annotations_skipped += num_annotations_skipped
         shard_idx = idx % num_shards
         output_tfrecords[shard_idx].write(tf_example.SerializeToString())
-        curated_counter += 1
-    tf.logging.info('Finished writing %d, skipped %d annotations.',
-                    curated_counter, total_num_annotations_skipped)
+        image_counter = idx + 1
+    tf.logging.info('Written %d images, skipped %d annotations.',
+                   curated_counter if image_counter == 0 else image_counter, 
+                   total_num_annotations_skipped)
 
 
 def main(_):
-  assert FLAGS.train_image_dir, '`train_image_dir` missing.'
-  assert FLAGS.train_annotations_file, '`train_annotations_file` missing.'
+  assert FLAGS.image_dir, '`image_dir` missing.'
+  assert FLAGS.annotations_file, '`annotations_file` missing.'
 
   if not tf.gfile.IsDirectory(FLAGS.output_dir):
     tf.gfile.MakeDirs(FLAGS.output_dir)
-  train_output_path = os.path.join(FLAGS.output_dir, 'coco_train.record')
+  output_path = os.path.join(FLAGS.output_dir, 'coco_tf_records.record')
 
   _create_tf_record_from_coco_annotations(
-      FLAGS.train_annotations_file,
-      FLAGS.train_image_dir,
-      train_output_path,
+      FLAGS.annotations_file,
+      FLAGS.image_dir,
+      FLAGS.filter_by_image_id,
+      output_path,
       FLAGS.include_masks,
       num_shards=1)
 
