@@ -64,6 +64,19 @@ class CocoDetectionEvaluator(object_detection_evaluation.DetectionEvaluator):
     self._groundtruth_list = []
     self._detection_boxes_list = []
 
+  def de_normalization(self, boxes, img_size):
+    #box - ymin,xmin,ymax,xmax
+    #img_size - h,w
+    #to_fixed - ymin * h, xmin * w, ymax * h, xmax * w 
+    fixed_boxes = []
+    for box in boxes:
+      ymin = box[0] * img_size[0]
+      xmin = box[1] * img_size[1]
+      ymax = box[2] * img_size[0]
+      xmax = box[3] * img_size[1]
+      fixed_boxes.append([ymin,xmin,ymax,xmax])
+    return np.asarray(fixed_boxes)
+
   def add_single_ground_truth_image_info(self,
                                          image_id,
                                          groundtruth_dict):
@@ -91,16 +104,23 @@ class CocoDetectionEvaluator(object_detection_evaluation.DetectionEvaluator):
     groundtruth_is_crowd = groundtruth_dict.get(
         standard_fields.InputDataFields.groundtruth_is_crowd)
     # Drop groundtruth_is_crowd if empty tensor.
+    groundtruth_is_crowd = np.asarray([bool(i) for i in groundtruth_is_crowd])
     if groundtruth_is_crowd is not None and not groundtruth_is_crowd.shape[0]:
       groundtruth_is_crowd = None
 
+    image_height = groundtruth_dict[standard_fields.InputDataFields.image_height][0]
+    image_width = groundtruth_dict[standard_fields.InputDataFields.image_width][0]
+    groundtruth_boxes = self.de_normalization(groundtruth_dict[
+                standard_fields.InputDataFields.groundtruth_boxes], 
+                (image_height, image_width))
+    if len(groundtruth_boxes.shape) != 2:
+      return
     self._groundtruth_list.extend(
         coco_tools.ExportSingleImageGroundtruthToCoco(
             image_id=image_id,
             next_annotation_id=self._annotation_id,
             category_id_set=self._category_id_set,
-            groundtruth_boxes=groundtruth_dict[
-                standard_fields.InputDataFields.groundtruth_boxes],
+            groundtruth_boxes=groundtruth_boxes,
             groundtruth_classes=groundtruth_dict[
                 standard_fields.InputDataFields.groundtruth_classes],
             groundtruth_is_crowd=groundtruth_is_crowd))
@@ -132,20 +152,28 @@ class CocoDetectionEvaluator(object_detection_evaluation.DetectionEvaluator):
       ValueError: If groundtruth for the image_id is not available.
     """
     if image_id not in self._image_ids:
-      raise ValueError('Missing groundtruth for image id: {}'.format(image_id))
+      return
+      # raise ValueError('Missing groundtruth for image id: {}'.format(image_id))
 
     if self._image_ids[image_id]:
       tf.logging.warning('Ignoring detection with image id %s since it was '
                          'previously added', image_id)
       return
-
+    image_height = detections_dict[standard_fields.InputDataFields.image_height][0]
+    image_width = detections_dict[standard_fields.InputDataFields.image_width][0]
+    detection_boxes = self.de_normalization(detections_dict[
+                standard_fields.DetectionResultFields.detection_boxes], 
+                (image_height, image_width))
+    groundtruth_boxes = self.de_normalization(detections_dict[
+                standard_fields.InputDataFields.groundtruth_boxes], 
+                (image_height, image_width))
+    if len(detection_boxes.shape) != 2:
+      return
     self._detection_boxes_list.extend(
         coco_tools.ExportSingleImageDetectionBoxesToCoco(
             image_id=image_id,
             category_id_set=self._category_id_set,
-            detection_boxes=detections_dict[standard_fields.
-                                            DetectionResultFields
-                                            .detection_boxes],
+            detection_boxes=detection_boxes,
             detection_scores=detections_dict[standard_fields.
                                              DetectionResultFields.
                                              detection_scores],

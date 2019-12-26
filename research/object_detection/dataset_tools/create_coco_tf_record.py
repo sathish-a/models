@@ -181,7 +181,11 @@ def create_tf_example(image,
       'image/object/class/label':
           dataset_util.int64_list_feature(category_ids),
       'image/object/difficult':
-          dataset_util.int64_list_feature(difficult_obj)
+          dataset_util.int64_list_feature(difficult_obj),
+      'image/height':
+          dataset_util.int64_feature(image_height),
+      'image/width':
+          dataset_util.int64_feature(image_width)
   }
   if include_masks:
     feature_dict['image/object/mask'] = (

@@ -121,10 +121,10 @@ class TfExampleDetectionAndGTParser(data_parser.DataToNumpyParser):
             Int64Parser(fields.TfExampleFields.object_is_crowd)),
         fields.InputDataFields.groundtruth_area: (
             FloatParser(fields.TfExampleFields.object_area)),
-        #fields.InputDataFields.original_image_height: (
-        #    Int64Parser(fields.TfExampleFields.height)),
-        #fields.InputDataFields.original_image_width: (
-        #    Int64Parser(fields.TfExampleFields.width))    
+        fields.InputDataFields.image_height: (
+           Int64Parser(fields.TfExampleFields.height)),
+        fields.InputDataFields.image_width: (
+           Int64Parser(fields.TfExampleFields.width))    
     }
 
   def parse(self, tf_example):
