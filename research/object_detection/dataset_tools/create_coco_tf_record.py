@@ -63,7 +63,6 @@ FLAGS = flags.FLAGS
 
 tf.logging.set_verbosity(tf.logging.INFO)
 
-
 def create_tf_example(image,
                       annotations_list,
                       image_dir,
@@ -102,6 +101,8 @@ def create_tf_example(image,
   image_width = image['width']
   filename = image['file_name']
   image_id = image['id']
+  if len(annotations_list) == 0:
+    return None, None, 1
 
   full_path = os.path.join(image_dir, filename)
   with tf.gfile.GFile(full_path, 'rb') as fid:
@@ -179,13 +180,7 @@ def create_tf_example(image,
       'image/object/area':
           dataset_util.float_list_feature(area),
       'image/object/class/label':
-          dataset_util.int64_list_feature(category_ids),
-      'image/object/difficult':
-          dataset_util.int64_list_feature(difficult_obj),
-      'image/height':
-          dataset_util.int64_feature(image_height),
-      'image/width':
-          dataset_util.int64_feature(image_width)
+          dataset_util.int64_list_feature(category_ids)
   }
   if include_masks:
     feature_dict['image/object/mask'] = (
@@ -247,8 +242,9 @@ def _create_tf_record_from_coco_annotations(
               image, annotations_list, image_dir, category_index, include_masks)
           total_num_annotations_skipped += num_annotations_skipped
           shard_idx = idx % num_shards
-          output_tfrecords[shard_idx].write(tf_example.SerializeToString())
-          curated_counter += 1
+          if tf_example is not None:
+            output_tfrecords[shard_idx].write(tf_example.SerializeToString())
+            curated_counter += 1
       else:
         if idx % 100 == 0:
           tf.logging.info('On image %d of %d', idx, len(images))
@@ -257,8 +253,9 @@ def _create_tf_record_from_coco_annotations(
             image, annotations_list, image_dir, category_index, include_masks)
         total_num_annotations_skipped += num_annotations_skipped
         shard_idx = idx % num_shards
-        output_tfrecords[shard_idx].write(tf_example.SerializeToString())
-        image_counter = idx + 1
+        if tf_example is not None:
+          output_tfrecords[shard_idx].write(tf_example.SerializeToString())
+          image_counter = idx + 1
     tf.logging.info('Written %d images, skipped %d annotations.',
                    curated_counter if image_counter == 0 else image_counter, 
                    total_num_annotations_skipped)

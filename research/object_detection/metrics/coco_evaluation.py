@@ -35,7 +35,6 @@ class CocoDetectionEvaluator(object_detection_evaluation.DetectionEvaluator):
                include_metrics_per_category=False,
                all_metrics_per_category=False):
     """Constructor.
-
     Args:
       categories: A list of dicts, each of which has the following keys -
         'id': (required) an integer id uniquely identifying this category.
@@ -64,27 +63,12 @@ class CocoDetectionEvaluator(object_detection_evaluation.DetectionEvaluator):
     self._groundtruth_list = []
     self._detection_boxes_list = []
 
-  def de_normalization(self, boxes, img_size):
-    #box - ymin,xmin,ymax,xmax
-    #img_size - h,w
-    #to_fixed - ymin * h, xmin * w, ymax * h, xmax * w 
-    fixed_boxes = []
-    for box in boxes:
-      ymin = box[0] * img_size[0]
-      xmin = box[1] * img_size[1]
-      ymax = box[2] * img_size[0]
-      xmax = box[3] * img_size[1]
-      fixed_boxes.append([ymin,xmin,ymax,xmax])
-    return np.asarray(fixed_boxes)
-
   def add_single_ground_truth_image_info(self,
                                          image_id,
                                          groundtruth_dict):
     """Adds groundtruth for a single image to be used for evaluation.
-
     If the image has already been added, a warning is logged, and groundtruth is
     ignored.
-
     Args:
       image_id: A unique string/integer identifier for the image.
       groundtruth_dict: A dictionary containing -
@@ -104,23 +88,16 @@ class CocoDetectionEvaluator(object_detection_evaluation.DetectionEvaluator):
     groundtruth_is_crowd = groundtruth_dict.get(
         standard_fields.InputDataFields.groundtruth_is_crowd)
     # Drop groundtruth_is_crowd if empty tensor.
-    groundtruth_is_crowd = np.asarray([bool(i) for i in groundtruth_is_crowd])
     if groundtruth_is_crowd is not None and not groundtruth_is_crowd.shape[0]:
       groundtruth_is_crowd = None
 
-    image_height = groundtruth_dict[standard_fields.InputDataFields.image_height][0]
-    image_width = groundtruth_dict[standard_fields.InputDataFields.image_width][0]
-    groundtruth_boxes = self.de_normalization(groundtruth_dict[
-                standard_fields.InputDataFields.groundtruth_boxes], 
-                (image_height, image_width))
-    if len(groundtruth_boxes.shape) != 2:
-      return
     self._groundtruth_list.extend(
         coco_tools.ExportSingleImageGroundtruthToCoco(
             image_id=image_id,
             next_annotation_id=self._annotation_id,
             category_id_set=self._category_id_set,
-            groundtruth_boxes=groundtruth_boxes,
+            groundtruth_boxes=groundtruth_dict[
+                standard_fields.InputDataFields.groundtruth_boxes],
             groundtruth_classes=groundtruth_dict[
                 standard_fields.InputDataFields.groundtruth_classes],
             groundtruth_is_crowd=groundtruth_is_crowd))
@@ -133,10 +110,8 @@ class CocoDetectionEvaluator(object_detection_evaluation.DetectionEvaluator):
                                      image_id,
                                      detections_dict):
     """Adds detections for a single image to be used for evaluation.
-
     If a detection has already been added for this image id, a warning is
     logged, and the detection is skipped.
-
     Args:
       image_id: A unique string/integer identifier for the image.
       detections_dict: A dictionary containing -
@@ -147,33 +122,24 @@ class CocoDetectionEvaluator(object_detection_evaluation.DetectionEvaluator):
           [num_boxes] containing detection scores for the boxes.
         DetectionResultFields.detection_classes: integer numpy array of shape
           [num_boxes] containing 1-indexed detection classes for the boxes.
-
     Raises:
       ValueError: If groundtruth for the image_id is not available.
     """
     if image_id not in self._image_ids:
-      return
-      # raise ValueError('Missing groundtruth for image id: {}'.format(image_id))
+      raise ValueError('Missing groundtruth for image id: {}'.format(image_id))
 
     if self._image_ids[image_id]:
       tf.logging.warning('Ignoring detection with image id %s since it was '
                          'previously added', image_id)
       return
-    image_height = detections_dict[standard_fields.InputDataFields.image_height][0]
-    image_width = detections_dict[standard_fields.InputDataFields.image_width][0]
-    detection_boxes = self.de_normalization(detections_dict[
-                standard_fields.DetectionResultFields.detection_boxes], 
-                (image_height, image_width))
-    groundtruth_boxes = self.de_normalization(detections_dict[
-                standard_fields.InputDataFields.groundtruth_boxes], 
-                (image_height, image_width))
-    if len(detection_boxes.shape) != 2:
-      return
+
     self._detection_boxes_list.extend(
         coco_tools.ExportSingleImageDetectionBoxesToCoco(
             image_id=image_id,
             category_id_set=self._category_id_set,
-            detection_boxes=detection_boxes,
+            detection_boxes=detections_dict[standard_fields.
+                                            DetectionResultFields
+                                            .detection_boxes],
             detection_scores=detections_dict[standard_fields.
                                              DetectionResultFields.
                                              detection_scores],
@@ -184,7 +150,6 @@ class CocoDetectionEvaluator(object_detection_evaluation.DetectionEvaluator):
 
   def dump_detections_to_json_file(self, json_output_path):
     """Saves the detections into json_output_path in the format used by MS COCO.
-
     Args:
       json_output_path: String containing the output file's path. It can be also
         None. In that case nothing will be written to the output file.
@@ -197,10 +162,8 @@ class CocoDetectionEvaluator(object_detection_evaluation.DetectionEvaluator):
 
   def evaluate(self):
     """Evaluates the detection boxes and returns a dictionary of coco metrics.
-
     Returns:
       A dictionary holding -
-
       1. summary_metrics:
       'DetectionBoxes_Precision/mAP': mean average precision over classes
         averaged over IOU thresholds ranging from .5 to .95 with .05
@@ -222,7 +185,6 @@ class CocoDetectionEvaluator(object_detection_evaluation.DetectionEvaluator):
         with 100.
       'DetectionBoxes_Recall/AR@100 (large)': average recall for large objects
         with 100 detections.
-
       2. per_category_ap: if include_metrics_per_category is True, category
       specific results with keys of the form:
       'Precision mAP ByCategory/category' (without the supercategory part if
@@ -251,18 +213,14 @@ class CocoDetectionEvaluator(object_detection_evaluation.DetectionEvaluator):
 
   def add_eval_dict(self, eval_dict):
     """Observes an evaluation result dict for a single example.
-
     When executing eagerly, once all observations have been observed by this
     method you can use `.evaluate()` to get the final metrics.
-
     When using `tf.estimator.Estimator` for evaluation this function is used by
     `get_estimator_eval_metric_ops()` to construct the metric update op.
-
     Args:
       eval_dict: A dictionary that holds tensors for evaluating an object
         detection model, returned from
         eval_util.result_dict_for_single_example().
-
     Returns:
       None when executing eagerly, or an update_op that can be used to update
       the eval metrics in `tf.estimator.EstimatorSpec`.
@@ -368,14 +326,11 @@ class CocoDetectionEvaluator(object_detection_evaluation.DetectionEvaluator):
 
   def get_estimator_eval_metric_ops(self, eval_dict):
     """Returns a dictionary of eval metric ops.
-
     Note that once value_op is called, the detections and groundtruth added via
     update_op are cleared.
-
     This function can take in groundtruth and detections for a batch of images,
     or for a single image. For the latter case, the batch dimension for input
     tensors need not be present.
-
     Args:
       eval_dict: A dictionary that holds tensors for evaluating object detection
         performance. For single-image evaluation, this dictionary may be
@@ -383,7 +338,6 @@ class CocoDetectionEvaluator(object_detection_evaluation.DetectionEvaluator):
         evaluation, `eval_dict` should contain the fields
         'num_groundtruth_boxes_per_image' and 'num_det_boxes_per_image' to
         properly unpad the tensors from the batch.
-
     Returns:
       a dictionary of metric names to tuple of value_op and update_op that can
       be used as eval metric ops in tf.estimator.EstimatorSpec. Note that all
@@ -443,7 +397,6 @@ class CocoMaskEvaluator(object_detection_evaluation.DetectionEvaluator):
 
   def __init__(self, categories, include_metrics_per_category=False):
     """Constructor.
-
     Args:
       categories: A list of dicts, each of which has the following keys -
         'id': (required) an integer id uniquely identifying this category.
@@ -470,10 +423,8 @@ class CocoMaskEvaluator(object_detection_evaluation.DetectionEvaluator):
                                          image_id,
                                          groundtruth_dict):
     """Adds groundtruth for a single image to be used for evaluation.
-
     If the image has already been added, a warning is logged, and groundtruth is
     ignored.
-
     Args:
       image_id: A unique string/integer identifier for the image.
       groundtruth_dict: A dictionary containing -
@@ -518,10 +469,8 @@ class CocoMaskEvaluator(object_detection_evaluation.DetectionEvaluator):
                                      image_id,
                                      detections_dict):
     """Adds detections for a single image to be used for evaluation.
-
     If a detection has already been added for this image id, a warning is
     logged, and the detection is skipped.
-
     Args:
       image_id: A unique string/integer identifier for the image.
       detections_dict: A dictionary containing -
@@ -533,7 +482,6 @@ class CocoMaskEvaluator(object_detection_evaluation.DetectionEvaluator):
           shape [num_boxes, image_height, image_width] containing instance
           masks corresponding to the boxes. The elements of the array must be
           in {0, 1}.
-
     Raises:
       ValueError: If groundtruth for the image_id is not available or if
         spatial shapes of groundtruth_instance_masks and detection_masks are
@@ -573,7 +521,6 @@ class CocoMaskEvaluator(object_detection_evaluation.DetectionEvaluator):
 
   def dump_detections_to_json_file(self, json_output_path):
     """Saves the detections into json_output_path in the format used by MS COCO.
-
     Args:
       json_output_path: String containing the output file's path. It can be also
         None. In that case nothing will be written to the output file.
@@ -586,10 +533,8 @@ class CocoMaskEvaluator(object_detection_evaluation.DetectionEvaluator):
 
   def evaluate(self):
     """Evaluates the detection masks and returns a dictionary of coco metrics.
-
     Returns:
       A dictionary holding -
-
       1. summary_metrics:
       'DetectionMasks_Precision/mAP': mean average precision over classes
         averaged over IOU thresholds ranging from .5 to .95 with .05 increments.
@@ -610,7 +555,6 @@ class CocoMaskEvaluator(object_detection_evaluation.DetectionEvaluator):
         with 100 detections.
       'DetectionMasks_Recall/AR@100 (large)': average recall for large objects
         with 100 detections.
-
       2. per_category_ap: if include_metrics_per_category is True, category
       specific results with keys of the form:
       'Precision mAP ByCategory/category' (without the supercategory part if
@@ -641,10 +585,8 @@ class CocoMaskEvaluator(object_detection_evaluation.DetectionEvaluator):
 
   def get_estimator_eval_metric_ops(self, eval_dict):
     """Returns a dictionary of eval metric ops.
-
     Note that once value_op is called, the detections and groundtruth added via
     update_op are cleared.
-
     Args:
       eval_dict: A dictionary that holds tensors for evaluating object detection
         performance. For single-image evaluation, this dictionary may be
@@ -652,7 +594,6 @@ class CocoMaskEvaluator(object_detection_evaluation.DetectionEvaluator):
         evaluation, `eval_dict` should contain the fields
         'num_groundtruth_boxes_per_image' and 'num_det_boxes_per_image' to
         properly unpad the tensors from the batch.
-
     Returns:
       a dictionary of metric names to tuple of value_op and update_op that can
       be used as eval metric ops in tf.estimator.EstimatorSpec. Note that all

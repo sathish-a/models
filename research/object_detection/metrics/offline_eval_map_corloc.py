@@ -35,6 +35,7 @@ import csv
 import os
 import re
 import tensorflow as tf
+import numpy as np
 
 from object_detection.core import standard_fields
 from object_detection.legacy import evaluator
@@ -71,6 +72,19 @@ def _generate_filenames(filenames):
   for filename in filenames:
     result += _generate_sharded_filenames(filename)
   return result
+
+def de_normalization(boxes, img_size):
+  #box - ymin,xmin,ymax,xmax
+  #img_size - h,w
+  #to_fixed - ymin * h, xmin * w, ymax * h, xmax * w 
+  fixed_boxes = []
+  for box in boxes:
+    ymin = box[0] * img_size[0]
+    xmin = box[1] * img_size[1]
+    ymax = box[2] * img_size[0]
+    xmax = box[3] * img_size[1]
+    fixed_boxes.append([ymin,xmin,ymax,xmax])
+  return np.asarray(fixed_boxes)
 
 
 def read_data_and_evaluate(input_config, eval_config):
@@ -116,7 +130,14 @@ def read_data_and_evaluate(input_config, eval_config):
         example.ParseFromString(string_record)
         decoded_dict = data_parser.parse(example)
 
-        if decoded_dict:
+        if decoded_dict and decoded_dict[standard_fields.DetectionResultFields.detection_boxes].shape[0] != 0:
+          image_height_width = decoded_dict[standard_fields.InputDataFields.original_image_spatial_shape]
+          decoded_dict[standard_fields.InputDataFields.groundtruth_boxes] = de_normalization(decoded_dict[
+              standard_fields.InputDataFields.groundtruth_boxes], 
+              image_height_width)
+          decoded_dict[standard_fields.DetectionResultFields.detection_boxes] = de_normalization(decoded_dict[
+              standard_fields.DetectionResultFields.detection_boxes], 
+              image_height_width)
           object_detection_evaluator.add_single_ground_truth_image_info(
               decoded_dict[standard_fields.DetectionResultFields.key],
               decoded_dict)

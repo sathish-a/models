@@ -111,20 +111,15 @@ class TfExampleDetectionAndGTParser(data_parser.DataToNumpyParser):
     }
 
     self.optional_items_to_handlers = {
-        fields.InputDataFields.groundtruth_difficult:
-            Int64Parser(fields.TfExampleFields.object_difficult),
-        fields.InputDataFields.groundtruth_group_of:
-            Int64Parser(fields.TfExampleFields.object_group_of),
         fields.InputDataFields.groundtruth_image_classes:
             Int64Parser(fields.TfExampleFields.image_class_label),
         fields.InputDataFields.groundtruth_is_crowd: (
             Int64Parser(fields.TfExampleFields.object_is_crowd)),
         fields.InputDataFields.groundtruth_area: (
             FloatParser(fields.TfExampleFields.object_area)),
-        fields.InputDataFields.image_height: (
-           Int64Parser(fields.TfExampleFields.height)),
-        fields.InputDataFields.image_width: (
-           Int64Parser(fields.TfExampleFields.width))    
+        fields.InputDataFields.original_image_spatial_shape: [
+          Int64Parser(fields.TfExampleFields.height),
+          Int64Parser(fields.TfExampleFields.width)]
     }
 
   def parse(self, tf_example):
@@ -163,6 +158,11 @@ class TfExampleDetectionAndGTParser(data_parser.DataToNumpyParser):
       parsed &= (results_dict[key] is not None)
 
     for key, parser in self.optional_items_to_handlers.items():
-      results_dict[key] = parser.parse(tf_example)
+      if key == fields.InputDataFields.original_image_spatial_shape:
+        height = parser[0].parse(tf_example)[0]
+        width = parser[1].parse(tf_example)[0]
+        results_dict[key] = np.asarray([height,width])
+      else:
+        results_dict[key] = parser.parse(tf_example)
 
     return results_dict if parsed else None
