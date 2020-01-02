@@ -18,9 +18,11 @@ from __future__ import division
 import tensorflow as tf
 
 from object_detection.core import standard_fields
+import habanatf
+import os
+from pathlib import Path
 
-
-def build_input(tfrecord_paths,is_habana):
+def build_input(tfrecord_paths):
   """Builds the graph's input.
 
   Args:
@@ -46,10 +48,9 @@ def build_input(tfrecord_paths,is_habana):
     # image_tensor = tf.image.decode_image(encoded_image, channels=3)
     # image_tensor.set_shape([None, None, 3])
     # image_tensor = tf.expand_dims(image_tensor, 0)
-  image_tensor = tf.image.decode_jpeg(encoded_image, channels=3)
-  if is_habana:
-    image_tensor = tf.image.resize_images(image_tensor, (600, 800))
-    image_tensor = tf.cast(image_tensor, tf.uint8)
+  image_tensor = tf.image.decode_jpeg(encoded_image, channels=3) 
+  image_tensor = tf.image.resize_images(image_tensor, (600, 800))
+  image_tensor = tf.cast(image_tensor, tf.uint8)
   image_tensor.set_shape([600, 800, 3])
   image_tensor = tf.expand_dims(image_tensor, 0)
   return serialized_example_tensor, image_tensor
@@ -70,6 +71,8 @@ def build_inference_graph(image_tensor, inference_graph_path):
     detected_labels_tensor: Detected labels. Int64 tensor,
         shape=[num_detections]
   """
+  os.environ['HABANA_RECIPE_PATH'] = str(Path(inference_graph_path).parent)
+  tf.logging.set_verbosity(tf.logging.INFO)
   with tf.gfile.Open(inference_graph_path, 'rb') as graph_def_file:
     graph_content = graph_def_file.read()
   graph_def = tf.GraphDef()
